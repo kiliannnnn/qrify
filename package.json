@@ -13,7 +13,13 @@
   },
   "keywords": [
     "qr-code",
-    "generator"
+    "generator",
+    "html",
+    "component",
+    "web-component",
+    "custom-element",
+    "qrify",
+    "qr"
   ],
   "author": "kiliannnnn",
   "license": "ISC",
