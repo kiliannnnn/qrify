@@ -1,6 +1,6 @@
 {
   "name": "@kiliannnnn/qrify",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A simple qr-code generator as a custom HTML component",
   "main": "index.js",
   "type": "module",
