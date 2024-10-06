@@ -1,0 +1,24 @@
+{
+  "name": "@kiliannnnn/qrify",
+  "version": "1.0.0",
+  "description": "A simple qr-code generator as a custom HTML component",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kiliannnnn/qrify.git"
+  },
+  "keywords": [
+    "qr-code",
+    "generator"
+  ],
+  "author": "kiliannnnn",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kiliannnnn/qrify/issues"
+  },
+  "homepage": "https://github.com/kiliannnnn/qrify#readme"
+}
