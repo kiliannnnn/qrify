@@ -1,11 +1,39 @@
 {
   "name": "@kiliannnnn/qrify",
-  "version": "1.1.0",
-  "description": "A simple qr-code generator as a custom HTML component",
-  "main": "index.js",
+  "version": "2.0.0",
+  "description": "QR code generator for the web: a zero-dependency UTF-8 encoder, an SSR-friendly SVG renderer, and a <qr-code> custom element.",
   "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./core": {
+      "types": "./core.d.ts",
+      "default": "./core.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": [
+    "./index.js"
+  ],
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "core.js",
+    "core.d.ts",
+    "src/",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test \"test/*.test.js\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check": "npm run typecheck && npm test"
   },
   "repository": {
     "type": "git",
@@ -13,7 +41,12 @@
   },
   "keywords": [
     "qr-code",
+    "qrcode",
     "generator",
+    "svg",
+    "canvas",
+    "astro",
+    "ssr",
     "html",
     "component",
     "web-component",
@@ -26,5 +59,10 @@
   "bugs": {
     "url": "https://github.com/kiliannnnn/qrify/issues"
   },
-  "homepage": "https://github.com/kiliannnnn/qrify#readme"
+  "homepage": "https://github.com/kiliannnnn/qrify#readme",
+  "devDependencies": {
+    "@zxing/library": "^0.21.3",
+    "jsdom": "^30.0.1",
+    "typescript": "^5.7.2"
+  }
 }
