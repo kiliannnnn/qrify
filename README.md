@@ -3,6 +3,7 @@
 A small, dependency-free QR code generator for the web.
 
 - **Encodes UTF-8 properly** — accents, emoji and CJK all round-trip through real readers.
+- **Picks the tightest encoding** — digits and uppercase payloads pack into numeric/alphanumeric mode automatically, producing a smaller code.
 - **Renders without a DOM** — `toSVG()` runs during a static build, so you can ship a QR code with zero client-side JavaScript.
 - **Ships a `<qr-code>` element** for the cases that genuinely need runtime generation.
 - **Verified against a decoder** — the test suite decodes what it generates with ZXing, across all 40 versions and all four error correction levels.
@@ -49,6 +50,7 @@ In Astro, put the import in a `<script>` tag so it runs on the client:
 | Attribute | Default | Description |
 | --- | --- | --- |
 | `string` | *required* | The text to encode. Rendering is skipped when it is missing or empty. |
+| `mode` | `auto` | Encoding mode: `auto`, `numeric`, `alphanumeric` or `byte`. |
 | `ecc` | `M` | Error correction level: `L`, `M`, `Q` or `H`. Higher survives more damage but needs a bigger code. |
 | `dot-color` | `#000000` | Colour of the data modules. Any CSS colour. |
 | `corner-color` | `#000000` | Colour of the three finder patterns. |
@@ -108,11 +110,28 @@ toSVG('https://example.com', { ecc: 'H', shape: 'squares' });   // → '<svg …
 
 toCanvas(document.querySelector('canvas'), 'https://example.com', { size: 256 });
 
-const { modules, size, version, ecc } = encode('https://example.com');
+const { modules, size, version, ecc, mode } = encode('https://example.com');
 // modules is a row-major size × size Uint8Array; 1 is a dark module
 
-maxBytes('H');   // → 1273
+maxBytes('H');                  // → 1273
+maxLength('H', 'numeric');      // → 3057
 ```
+
+### Encoding modes
+
+By default the tightest mode the payload allows is chosen, which can shrink the
+code by several versions:
+
+| Payload | Mode | Cost per character |
+| --- | --- | --- |
+| `0123456789` | `numeric` | 3⅓ bits |
+| `HTTPS://KILIAN.DEV` | `alphanumeric` | 5½ bits |
+| anything else | `byte` | 8 bits per UTF-8 byte |
+
+Alphanumeric mode covers `0-9`, `A-Z` (uppercase only), space and `$%*+-./:`.
+Pass `mode` explicitly to override the choice; it throws a `TypeError` if the
+payload cannot be represented in the mode you asked for. Payloads are encoded
+as a single segment — mixing modes within one code is not supported.
 
 ### Options
 
@@ -145,6 +164,7 @@ What changed in 2.0:
 | --- | --- |
 | Renders a `<canvas>` | Renders an `<svg>`; pass `renderer="canvas"` for the old output |
 | Error correction fixed at `L` | Defaults to `M`, configurable with `ecc` |
+| Byte mode only | Numeric and alphanumeric modes chosen automatically |
 | No quiet zone | 4-module quiet zone, configurable with `margin` |
 | Transparent background | White background, configurable with `bg` |
 | Sized from the parent box at connect time | Sized by CSS, or by the `size` attribute |

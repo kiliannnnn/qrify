@@ -7,7 +7,8 @@
  * const svg = toSVG('https://example.com', { ecc: 'Q' });
  * ```
  */
-export { encode, maxBytes, isFinder, ECC_LEVELS } from './src/encoder.js';
+export { encode, maxBytes, maxLength, isFinder, ECC_LEVELS } from './src/encoder.js';
 export { toSVG } from './src/svg.js';
 export { toCanvas } from './src/canvas.js';
 export { DEFAULTS, SHAPES } from './src/options.js';
+export { MODES, ALPHANUMERIC_CHARS, detectMode } from './src/modes.js';

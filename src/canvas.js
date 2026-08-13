@@ -23,7 +23,7 @@ export function toCanvas(canvas, input, options = {}) {
     }
 
     const o = resolveOptions(options);
-    const { modules, size, version, ecc } = encode(input, { ecc: o.ecc, minVersion: o.minVersion });
+    const { modules, size, version, ecc } = encode(input, { ecc: o.ecc, mode: o.mode, minVersion: o.minVersion });
     const total = size + o.margin * 2;
 
     const dpr = options.devicePixelRatio ?? (globalThis.devicePixelRatio || 1);

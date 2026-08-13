@@ -1,9 +1,16 @@
 export type EccLevel = 'L' | 'M' | 'Q' | 'H';
 export type ModuleShape = 'dots' | 'squares';
+export type EncodingMode = 'numeric' | 'alphanumeric' | 'byte';
 
 export interface EncodeOptions {
     /** Error correction level. Defaults to 'M'. */
     ecc?: EccLevel;
+    /**
+     * Encoding mode. 'auto' (the default) picks the tightest mode the payload
+     * allows: numeric for digits, alphanumeric for the uppercase/symbol
+     * subset, byte for everything else.
+     */
+    mode?: 'auto' | EncodingMode;
     /** Force at least this QR version (1-40). Defaults to 1. */
     minVersion?: number;
 }
@@ -44,6 +51,8 @@ export interface EncodeResult {
     version: number;
     /** Error correction level used. */
     ecc: EccLevel;
+    /** Encoding mode used. */
+    mode: EncodingMode;
 }
 
 export interface CanvasResult {
@@ -57,6 +66,9 @@ export interface CanvasResult {
 }
 
 export declare const ECC_LEVELS: readonly EccLevel[];
+export declare const MODES: readonly EncodingMode[];
+/** The 45 characters alphanumeric mode can represent, in their code order. */
+export declare const ALPHANUMERIC_CHARS: string;
 export declare const SHAPES: readonly ModuleShape[];
 export declare const DEFAULTS: Required<Pick<RenderOptions, 'ecc' | 'minVersion' | 'margin' | 'background' | 'dotColor' | 'shape'>> & { cornerColor: string | null };
 
@@ -70,6 +82,15 @@ export declare function encode(input: string | Uint8Array, options?: EncodeOptio
 
 /** Maximum encodable byte length at a given error correction level. */
 export declare function maxBytes(ecc?: EccLevel): number;
+
+/**
+ * Maximum payload length at a given error correction level and mode.
+ * Characters for numeric/alphanumeric, bytes for byte mode.
+ */
+export declare function maxLength(ecc?: EccLevel, mode?: EncodingMode): number;
+
+/** The tightest mode that can represent `text`. */
+export declare function detectMode(text: string): EncodingMode;
 
 /** True when (x, y) falls inside one of the three finder patterns. */
 export declare function isFinder(x: number, y: number, size: number): boolean;

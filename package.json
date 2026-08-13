@@ -63,6 +63,7 @@
   "devDependencies": {
     "@zxing/library": "^0.21.3",
     "jsdom": "^30.0.1",
+    "qrcode-generator": "^2.0.4",
     "typescript": "^5.7.2"
   }
 }

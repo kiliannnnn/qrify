@@ -39,6 +39,11 @@ export function decode({ modules, size }, { scale = 4, quiet = 4 } = {}) {
     const hints = new Map();
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE]);
     hints.set(DecodeHintType.TRY_HARDER, true);
+    // These are clean, axis-aligned, synthetic images. Without this hint ZXing
+    // runs its camera-oriented detector, which spuriously fails to *locate*
+    // perfectly valid codes (it reports NotFoundException on output from other
+    // encoders too). The hint is about the reader, not about the code.
+    hints.set(DecodeHintType.PURE_BARCODE, true);
 
     const reader = new MultiFormatReader();
     reader.setHints(hints);

@@ -4,6 +4,7 @@
 
 export const DEFAULTS = {
     ecc: 'M',
+    mode: 'auto',
     minVersion: 1,
     // Quiet zone in modules. The QR specification requires 4; anything less
     // makes the code noticeably harder for real cameras to lock onto.
@@ -38,6 +39,7 @@ export function resolveOptions(options = {}) {
 
     return {
         ecc: o.ecc,
+        mode: o.mode,
         minVersion: o.minVersion,
         margin: Math.round(margin),
         background: o.background,

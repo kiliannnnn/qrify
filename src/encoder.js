@@ -6,6 +6,7 @@ import {
     GF_LOG,
     GF_EXP,
 } from './tables.js';
+import { MODES, detectMode, supportsMode, capacityFor, writeSegment } from './modes.js';
 
 /**
  * Error correction levels, in the order used by the lookup tables.
@@ -42,13 +43,26 @@ function blockLayout(version, ecclevel) {
 }
 
 /**
- * Data capacity in bytes for a version/ECC pair, after the mode nibble,
- * the character count indicator and the terminator are accounted for.
+ * Number of data codewords available at a version/ECC pair.
  */
-function byteCapacity(version, ecclevel) {
+function dataCodewordsFor(version, ecclevel) {
     const { neccblk1, neccblk2, datablkw } = blockLayout(version, ecclevel);
-    // Header costs 2 bytes up to version 9 (8-bit length) and 3 above (16-bit).
-    return datablkw * (neccblk1 + neccblk2) + neccblk2 - (version <= 9 ? 2 : 3);
+    return datablkw * (neccblk1 + neccblk2) + neccblk2;
+}
+
+/**
+ * Maximum payload length at a given ECC level and mode.
+ *
+ * @param {'L'|'M'|'Q'|'H'} [ecc]
+ * @param {'numeric'|'alphanumeric'|'byte'} [mode]
+ * @returns {number} Characters for numeric/alphanumeric, bytes for byte mode.
+ */
+export function maxLength(ecc = 'M', mode = 'byte') {
+    if (!MODES.includes(mode)) {
+        throw new TypeError(`qrify: unknown mode ${JSON.stringify(mode)}. Expected one of ${MODES.join(', ')}.`);
+    }
+    const ecclevel = eccIndex(ecc);
+    return capacityFor(mode, 40, dataCodewordsFor(40, ecclevel));
 }
 
 /**
@@ -58,15 +72,15 @@ function byteCapacity(version, ecclevel) {
  * @returns {number}
  */
 export function maxBytes(ecc = 'M') {
-    return byteCapacity(40, eccIndex(ecc));
+    return maxLength(ecc, 'byte');
 }
 
 /**
- * Smallest version that fits `length` bytes, or null when nothing does.
+ * Smallest version that fits `length` units of `mode`, or null when none does.
  */
-function selectVersion(length, ecclevel, minVersion) {
+function selectVersion(mode, length, ecclevel, minVersion) {
     for (let version = Math.max(1, minVersion); version <= 40; version++) {
-        if (length <= byteCapacity(version, ecclevel)) return version;
+        if (length <= capacityFor(mode, version, dataCodewordsFor(version, ecclevel))) return version;
     }
     return null;
 }
@@ -74,23 +88,30 @@ function selectVersion(length, ecclevel, minVersion) {
 /**
  * Encode text (or raw bytes) as a QR code matrix.
  *
- * Text is encoded as UTF-8 in byte mode, so any Unicode input round-trips
- * through a standards-compliant reader.
+ * Digits are encoded in numeric mode and the uppercase/symbol subset in
+ * alphanumeric mode, both of which pack tighter than byte mode. Anything else
+ * is encoded as UTF-8 in byte mode, so any Unicode input round-trips through a
+ * standards-compliant reader.
  *
  * @param {string|Uint8Array} input Text or raw bytes to encode.
  * @param {object} [options]
  * @param {'L'|'M'|'Q'|'H'} [options.ecc='M'] Error correction level.
+ * @param {'auto'|'numeric'|'alphanumeric'|'byte'} [options.mode='auto']
+ *   Encoding mode. 'auto' picks the tightest one the payload allows.
  * @param {number} [options.minVersion=1] Force at least this version (1-40).
- * @returns {{modules: Uint8Array, size: number, version: number, ecc: string}}
+ * @returns {{modules: Uint8Array, size: number, version: number, ecc: string, mode: string}}
  *   `modules` is a row-major `size * size` matrix; 1 is a dark module.
- * @throws {TypeError} when the input is not a string or Uint8Array.
+ * @throws {TypeError} when the input is not a string or Uint8Array, or the
+ *   requested mode cannot represent it.
  * @throws {RangeError} when the input does not fit in a version 40 code.
  */
 export function encode(input, options = {}) {
-    const { ecc = 'M', minVersion = 1 } = options;
+    const { ecc = 'M', minVersion = 1, mode = 'auto' } = options;
 
     let bytes;
+    let text = null;
     if (typeof input === 'string') {
+        text = input;
         bytes = encoder.encode(input);
     } else if (input instanceof Uint8Array) {
         bytes = input;
@@ -100,12 +121,31 @@ export function encode(input, options = {}) {
         );
     }
 
+    // Raw bytes have no character semantics, so they always go through byte mode.
+    let selected;
+    if (text === null) {
+        selected = 'byte';
+    } else if (mode === 'auto') {
+        selected = detectMode(text);
+    } else if (!MODES.includes(mode)) {
+        throw new TypeError(
+            `qrify: unknown mode ${JSON.stringify(mode)}. Expected 'auto' or one of ${MODES.join(', ')}.`
+        );
+    } else if (!supportsMode(text, mode)) {
+        throw new TypeError(`qrify: the payload cannot be represented in ${mode} mode.`);
+    } else {
+        selected = mode;
+    }
+
     const ecclevel = eccIndex(ecc);
-    const version = selectVersion(bytes.length, ecclevel, minVersion);
+    const length = selected === 'byte' ? bytes.length : text.length;
+    const version = selectVersion(selected, length, ecclevel, minVersion);
     if (version === null) {
+        const limit = capacityFor(selected, 40, dataCodewordsFor(40, ecclevel));
+        const unit = selected === 'byte' ? 'bytes' : 'characters';
         throw new RangeError(
-            `qrify: ${bytes.length} bytes is too much data for a QR code. ` +
-            `The maximum at error correction level ${ECC_LEVELS[ecclevel - 1]} is ${byteCapacity(40, ecclevel)} bytes.`
+            `qrify: ${length} ${unit} is too much data for a QR code. ` +
+            `The maximum in ${selected} mode at error correction level ${ECC_LEVELS[ecclevel - 1]} is ${limit} ${unit}.`
         );
     }
 
@@ -123,7 +163,6 @@ export function encode(input, options = {}) {
     const eccbuf = new Uint8Array(totalCodewords + 8);
     let qrframe = new Uint8Array(width * width);
     const framask = new Uint8Array(((width * (width + 1) + 1) >> 1) + 1);
-    const rlens = new Int32Array(width + 2);
     const genpoly = new Uint8Array(eccblkwid + 1);
 
     let x, y, k, t, v, i, j;
@@ -299,84 +338,85 @@ export function encode(input, options = {}) {
         }
     }
 
-    // Using the table of the length of each run, calculate the amount of bad
-    // image - long runs or those that look like finders; called twice, once
-    // each for X and Y.
-    function badruns(length) {
-        let i;
-        let runsbad = 0;
-        for (i = 0; i <= length; i++)
-            if (rlens[i] >= 5)
-                runsbad += N1 + rlens[i] - 5;
-        // BwBBBwB as in finder
-        for (i = 3; i < length - 1; i += 2)
-            if (rlens[i - 2] == rlens[i + 2]
-                && rlens[i + 2] == rlens[i - 1]
-                && rlens[i - 1] == rlens[i + 1]
-                && rlens[i - 1] * 3 == rlens[i]
-                // white around the black pattern? Not part of spec
-                && (rlens[i - 3] == 0 // beginning
-                    || i + 3 > length  // end
-                    || rlens[i - 3] * 3 >= rlens[i] * 4 || rlens[i + 3] * 3 >= rlens[i] * 4)
-            )
-                runsbad += N3;
-        return runsbad;
+    // Penalty scoring from ISO/IEC 18004 section 8.8.2. The original code
+    // used a cheaper heuristic here; its approximation of rule 3 under-counted
+    // false finder patterns, and codes with large regular regions (numeric or
+    // alphanumeric payloads with a lot of padding) could end up masked such
+    // that a real scanner's detector could not locate the symbol at all.
+
+    // Rule 3 looks for the finder-like sequence 1:1:3:1:1 with four light
+    // modules on either side, in both orientations.
+    const RULE3_A = [1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0];
+    const RULE3_B = [0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1];
+
+    function matchesAt(line, at, pattern) {
+        for (let i = 0; i < pattern.length; i++) {
+            if (line[at + i] !== pattern[i]) return false;
+        }
+        return true;
     }
 
-    // Calculate how bad the masked image is - blocks, imbalance, runs, or finders.
+    // Rules 1 and 3 applied to a single row or column.
+    function scoreLine(line) {
+        let score = 0;
+
+        // Rule 1: runs of five or more modules of the same colour.
+        let run = 1;
+        for (let i = 1; i < width; i++) {
+            if (line[i] === line[i - 1]) {
+                run++;
+            } else {
+                if (run >= 5) score += N1 + run - 5;
+                run = 1;
+            }
+        }
+        if (run >= 5) score += N1 + run - 5;
+
+        // Rule 3: finder-like patterns.
+        for (let i = 0; i + 11 <= width; i++) {
+            if (matchesAt(line, i, RULE3_A) || matchesAt(line, i, RULE3_B)) score += N3;
+        }
+
+        return score;
+    }
+
+    /**
+     * Total penalty for the current qrframe. Lower is better.
+     */
     function badcheck() {
-        let x, y, h, b, b1;
-        let thisbad = 0;
-        let bw = 0;
+        let score = 0;
+        let dark = 0;
 
-        // blocks of same color.
-        for (y = 0; y < width - 1; y++)
-            for (x = 0; x < width - 1; x++)
-                if ((qrframe[x + width * y] && qrframe[(x + 1) + width * y]
-                    && qrframe[x + width * (y + 1)] && qrframe[(x + 1) + width * (y + 1)]) // all black
-                    || !(qrframe[x + width * y] || qrframe[(x + 1) + width * y]
-                        || qrframe[x + width * (y + 1)] || qrframe[(x + 1) + width * (y + 1)])) // all white
-                    thisbad += N2;
+        const row = new Uint8Array(width);
+        const column = new Uint8Array(width);
 
-        // X runs
-        for (y = 0; y < width; y++) {
-            rlens[0] = 0;
-            for (h = b = x = 0; x < width; x++) {
-                if ((b1 = qrframe[x + width * y]) == b)
-                    rlens[h]++;
-                else
-                    rlens[++h] = 1;
-                b = b1;
-                bw += b ? 1 : -1;
+        for (let y = 0; y < width; y++) {
+            for (let x = 0; x < width; x++) {
+                row[x] = qrframe[x + width * y];
+                column[x] = qrframe[y + width * x];
+                if (row[x]) dark++;
             }
-            thisbad += badruns(h);
+            score += scoreLine(row);
+            score += scoreLine(column);
         }
 
-        // black/white imbalance
-        if (bw < 0)
-            bw = -bw;
-
-        let big = bw;
-        let count = 0;
-        big += big << 2;
-        big <<= 1;
-        while (big > width * width)
-            big -= width * width, count++;
-        thisbad += count * N4;
-
-        // Y runs
-        for (x = 0; x < width; x++) {
-            rlens[0] = 0;
-            for (h = b = y = 0; y < width; y++) {
-                if ((b1 = qrframe[x + width * y]) == b)
-                    rlens[h]++;
-                else
-                    rlens[++h] = 1;
-                b = b1;
+        // Rule 2: blocks of the same colour, counted as overlapping 2x2 boxes.
+        for (let y = 0; y < width - 1; y++) {
+            for (let x = 0; x < width - 1; x++) {
+                const a = qrframe[x + width * y];
+                if (a === qrframe[(x + 1) + width * y]
+                    && a === qrframe[x + width * (y + 1)]
+                    && a === qrframe[(x + 1) + width * (y + 1)]) {
+                    score += N2;
+                }
             }
-            thisbad += badruns(h);
         }
-        return thisbad;
+
+        // Rule 4: deviation from an even split of dark and light modules.
+        const percent = (dark * 100) / (width * width);
+        score += Math.floor(Math.abs(percent - 50) / 5) * N4;
+
+        return score;
     }
 
     // insert finders - black to frame, white to mask
@@ -486,44 +526,8 @@ export function encode(input, options = {}) {
             if (qrframe[x + width * y])
                 setmask(x, y);
 
-    // Copy the payload in, leaving room for the mode nibble and the character
-    // count indicator that get shifted in below.
-    v = bytes.length;
-    strinbuf.set(bytes, 0);
-
-    // shift and repack to insert mode nibble and length prefix
-    i = v;
-    if (version > 9) {
-        strinbuf[i + 2] = 0;
-        strinbuf[i + 3] = 0;
-        while (i--) {
-            t = strinbuf[i];
-            strinbuf[i + 3] |= 255 & (t << 4);
-            strinbuf[i + 2] = t >> 4;
-        }
-        strinbuf[2] |= 255 & (v << 4);
-        strinbuf[1] = v >> 4;
-        strinbuf[0] = 0x40 | (v >> 12);
-    }
-    else {
-        strinbuf[i + 1] = 0;
-        strinbuf[i + 2] = 0;
-        while (i--) {
-            t = strinbuf[i];
-            strinbuf[i + 2] |= 255 & (t << 4);
-            strinbuf[i + 1] = t >> 4;
-        }
-        strinbuf[1] |= 255 & (v << 4);
-        strinbuf[0] = 0x40 | (v >> 4);
-    }
-
-    // fill to end with pad pattern
-    i = v + 3 - (version < 10 ? 1 : 0);
-    while (i < dataCodewords) {
-        strinbuf[i++] = 0xec;
-        if (i == dataCodewords) break;
-        strinbuf[i++] = 0x11;
-    }
+    // Mode indicator, character count, payload, terminator and pad pattern.
+    writeSegment(strinbuf, { mode: selected, text, bytes }, version, dataCodewords);
 
     // calculate generator polynomial
     genpoly[0] = 1;
@@ -611,26 +615,24 @@ export function encode(input, options = {}) {
         }
     }
 
-    // save pre-mask copy of frame
+    // Score all eight masks and keep the best. The original code stopped early
+    // when a mask looked "good enough", inherited from the Arduino version
+    // where the later masks were expensive; there is no reason to skip them
+    // here, and evaluating all eight is what the specification asks for.
     const cleanframe = qrframe.slice(0);
     t = 0;             // best mask
-    y = 30000;         // demerit
-    // for instead of while since in original arduino code
-    // if an early mask was "good enough" it wouldn't try for a better one
-    // since they get more complex and take longer.
+    y = Infinity;      // best penalty
     for (k = 0; k < 8; k++) {
+        qrframe = cleanframe.slice(0);
         applymask(k);
         x = badcheck();
-        if (x < y) { // current mask better than previous best?
+        if (x < y) {
             y = x;
             t = k;
         }
-        if (t == 7)
-            break;     // don't increment k, avoids redoing the mask
-        qrframe = cleanframe.slice(0); // reset for next pass
     }
-    if (t != k)        // redo best mask - none good enough, last wasn't t
-        applymask(t);
+    qrframe = cleanframe.slice(0);
+    applymask(t);
 
     // add in final mask/ecclevel bytes
     y = FORMAT_WORD[t + ((ecclevel - 1) << 3)];
@@ -658,6 +660,7 @@ export function encode(input, options = {}) {
         size: width,
         version,
         ecc: ECC_LEVELS[ecclevel - 1],
+        mode: selected,
     };
 }
 

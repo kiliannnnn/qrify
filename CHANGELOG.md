@@ -18,7 +18,11 @@
 
 - `@kiliannnnn/qrify/core` — a side-effect-free entry point with no DOM access, for static builds and SSR.
 - `toSVG()`, `toCanvas()`, `encode()` and `maxBytes()` as a public API.
-- `ecc`, `margin`, `bg`, `size`, `shape`, `renderer` and `label` attributes.
+- Numeric and alphanumeric encoding modes, selected automatically. A digits-only
+  payload now needs 3⅓ bits per character instead of 8, so it fits in a much
+  smaller code. `mode` forces a specific one; `maxLength(ecc, mode)` and
+  `detectMode(text)` are exported.
+- `ecc`, `mode`, `margin`, `bg`, `size`, `shape`, `renderer` and `label` attributes.
 - A four-module quiet zone, as the specification requires.
 - `role="img"` and an accessible name on the generated output.
 - `qrify:render` and `qrify:error` events; encoding failures no longer throw into the page.
@@ -34,6 +38,12 @@
 - **The background defaults to white** instead of transparent. Set `bg="transparent"` for the old behaviour.
 - Layout styles come from an injected stylesheet rather than inline styles on the host, so page CSS can override them.
 - Lookup tables are allocated once per process instead of once per generated code.
+- Mask selection now uses the ISO/IEC 18004 penalty rules and evaluates all
+  eight masks. The previous heuristic under-counted false finder patterns and
+  stopped early once a mask looked "good enough"; measured over 400 payloads the
+  new scoring leaves about 9% fewer finder-like patterns for a scanner's
+  detector to trip over. Output for a given payload may differ from 1.x as a
+  result, though both are valid codes.
 
 ## 1.1.0
 

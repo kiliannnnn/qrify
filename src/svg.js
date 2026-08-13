@@ -80,7 +80,7 @@ function dotsPath(cells, size, margin) {
  */
 export function toSVG(input, options = {}) {
     const o = resolveOptions(options);
-    const { modules, size } = encode(input, { ecc: o.ecc, minVersion: o.minVersion });
+    const { modules, size } = encode(input, { ecc: o.ecc, mode: o.mode, minVersion: o.minVersion });
     const total = size + o.margin * 2;
 
     // Split the matrix so finders can be drawn in their own colour and always
