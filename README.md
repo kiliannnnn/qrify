@@ -176,10 +176,16 @@ What changed in 2.0:
 
 ```bash
 npm install
-npm test          # round-trip and rendering tests
-npm run typecheck # validates the published .d.ts files
-npm run check     # both
+npm test           # everything
+npm run test:core  # encoder and renderers, no DOM needed
+npm run test:dom   # custom element, under jsdom
+npm run typecheck  # validates the published .d.ts files
+npm run check      # typecheck + tests
 ```
+
+Node 20 or newer. The element tests additionally need Node 22.22+, because
+that is jsdom's floor; CI runs `test:core` on Node 20 and the full suite on
+22 and 24.
 
 ## Credits
 

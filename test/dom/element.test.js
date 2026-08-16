@@ -12,7 +12,7 @@ for (const key of ['window', 'document', 'HTMLElement', 'HTMLCanvasElement', 'cu
     if (dom.window[key] !== undefined) globalThis[key] = dom.window[key];
 }
 
-const { defineQrify } = await import('../index.js');
+const { defineQrify } = await import('../../index.js');
 defineQrify();
 
 function mount(attributes = {}) {

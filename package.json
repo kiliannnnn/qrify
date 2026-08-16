@@ -28,10 +28,12 @@
     "CHANGELOG.md"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "scripts": {
-    "test": "node --test \"test/*.test.js\"",
+    "test:core": "node --test test/*.test.js",
+    "test:dom": "node --test test/dom/*.test.js",
+    "test": "npm run test:core && npm run test:dom",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check": "npm run typecheck && npm test"
   },

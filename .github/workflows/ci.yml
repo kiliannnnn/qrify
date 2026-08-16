@@ -7,11 +7,20 @@ on:
 
 jobs:
   test:
+    name: test (node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        node: ['20.x', '22.x', '24.x']
+        include:
+          # jsdom requires Node 22.22+, so Node 20 runs everything except the
+          # element tests. The library itself is still exercised there.
+          - node: '20.x'
+            script: test:core
+          - node: '22.x'
+            script: test
+          - node: '24.x'
+            script: test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,7 +28,7 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - run: npm test
+      - run: npm run ${{ matrix.script }}
 
   typecheck:
     runs-on: ubuntu-latest
