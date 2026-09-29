@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.1.0
+
+### Added
+
+- `cornerShape: 'rounded'` and `cornerRadius` (0–1) for rounded finder
+  patterns. The ring, the gap and the centre stay concentric; `1` makes them
+  circular. Attributes: `corner-shape`, `corner-radius`.
+- `cornerDotColor` to paint the 3×3 centre of each finder pattern separately
+  from its ring. Defaults to `cornerColor`. Attribute: `corner-dot-color`.
+- `dotRadius` (0.2–0.5 modules) for smaller data dots. Attribute: `dot-radius`.
+- `class` option for `toSVG`, set on the root `<svg>`.
+- `CORNER_SHAPES` export.
+
+### Changed
+
+- Finder patterns are drawn as three shapes each (outer square, hole, centre)
+  instead of module runs, and dot paths are written slightly differently. The
+  default output looks identical but is not byte-for-byte the same as 2.0.0.
+
 ## 2.0.0
 
 ### Fixed

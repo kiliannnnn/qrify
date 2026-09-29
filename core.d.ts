@@ -1,5 +1,6 @@
 export type EccLevel = 'L' | 'M' | 'Q' | 'H';
 export type ModuleShape = 'dots' | 'squares';
+export type CornerShape = 'square' | 'rounded';
 export type EncodingMode = 'numeric' | 'alphanumeric' | 'byte';
 
 export interface EncodeOptions {
@@ -24,8 +25,16 @@ export interface RenderOptions extends EncodeOptions {
     dotColor?: string;
     /** Colour of the three finder patterns. Defaults to `dotColor`. */
     cornerColor?: string;
+    /** Colour of the 3×3 centre of each finder pattern. Defaults to `cornerColor`. */
+    cornerDotColor?: string;
     /** Data module shape. Defaults to 'dots'. */
     shape?: ModuleShape;
+    /** Radius of a data dot in modules, from 0.2 to 0.5. Defaults to 0.5. Only used by 'dots'. */
+    dotRadius?: number;
+    /** Finder pattern shape. Defaults to 'square'. */
+    cornerShape?: CornerShape;
+    /** Rounding for 'rounded' corners, from 0 (square) to 1 (circular). Defaults to 0.5. */
+    cornerRadius?: number;
     /** Width/height in px. */
     size?: number;
     /** Accessible name. Defaults to a label derived from the payload. */
@@ -35,6 +44,8 @@ export interface RenderOptions extends EncodeOptions {
 export interface SvgOptions extends RenderOptions {
     /** Text for an SVG <title> element. */
     title?: string;
+    /** Class attribute for the root <svg>. */
+    class?: string;
 }
 
 export interface CanvasOptions extends RenderOptions {
@@ -70,7 +81,8 @@ export declare const MODES: readonly EncodingMode[];
 /** The 45 characters alphanumeric mode can represent, in their code order. */
 export declare const ALPHANUMERIC_CHARS: string;
 export declare const SHAPES: readonly ModuleShape[];
-export declare const DEFAULTS: Required<Pick<RenderOptions, 'ecc' | 'minVersion' | 'margin' | 'background' | 'dotColor' | 'shape'>> & { cornerColor: string | null };
+export declare const CORNER_SHAPES: readonly CornerShape[];
+export declare const DEFAULTS: Required<Pick<RenderOptions, 'ecc' | 'minVersion' | 'margin' | 'background' | 'dotColor' | 'shape' | 'dotRadius' | 'cornerShape' | 'cornerRadius'>> & { cornerColor: string | null; cornerDotColor: string | null };
 
 /**
  * Encode text or bytes as a QR matrix. Strings are encoded as UTF-8.

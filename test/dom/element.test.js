@@ -112,6 +112,26 @@ test('applies canvas-class and canvas-style, including the camelCase aliases', a
     legacy.remove();
 });
 
+test('passes corner and dot attributes through to the renderer', async () => {
+    const el = mount({
+        string: 'x',
+        'corner-shape': 'rounded',
+        'corner-radius': '1',
+        'corner-color': '#f00',
+        'corner-dot-color': '#00f',
+        'dot-radius': '0.4',
+    });
+    const markup = el.toSVG();
+    assert.match(markup, /fill="#00f"/);
+    assert.match(markup, /a3\.5 3\.5 /);
+    assert.match(markup, /a\.4 \.4 /);
+
+    el.setAttribute('corner-shape', 'square');
+    await settle();
+    assert.doesNotMatch(el.querySelector('svg').outerHTML, /a3\.5/);
+    el.remove();
+});
+
 test('renders nothing, and does not throw, without a payload', async () => {
     const el = mount({});
     assert.equal(el.children.length, 0);

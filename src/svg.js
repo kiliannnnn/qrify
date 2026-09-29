@@ -1,4 +1,4 @@
-import { encode, isFinder } from './encoder.js';
+import { encode, isFinder, finderOrigins } from './encoder.js';
 import { resolveOptions, isTransparent, defaultLabel } from './options.js';
 
 /**
@@ -39,19 +39,60 @@ function squaresPath(cells, size, margin) {
 }
 
 /**
- * Build a path of unit-diameter circles, one per module.
+ * Format a coordinate compactly: no float noise, no leading zero.
  */
-function dotsPath(cells, size, margin) {
+function num(value) {
+    return String(Math.round(value * 1e4) / 1e4).replace(/^(-?)0\./, '$1.');
+}
+
+/**
+ * Build a path of circles of radius `r`, one per module.
+ */
+function dotsPath(cells, size, margin, r) {
+    const R = num(r);
+    const D = num(r * 2);
+    const arcs = `a${R} ${R} 0 1 0 ${D} 0a${R} ${R} 0 1 0-${D} 0z`;
     const parts = [];
     for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
             if (!cells[y * size + x]) continue;
-            const cx = x + margin;
-            const cy = y + margin + 0.5;
-            parts.push(`M${cx} ${cy}a.5.5 0 1 0 1 0a.5.5 0 1 0-1 0z`);
+            parts.push(`M${num(x + margin + 0.5 - r)} ${num(y + margin + 0.5)}${arcs}`);
         }
     }
     return parts.join('');
+}
+
+/**
+ * A `w`-wide square at (x, y) with corners of radius `r`, drawn clockwise.
+ */
+function roundedSquare(x, y, w, r) {
+    if (r <= 0) return `M${x} ${y}h${w}v${w}h-${w}z`;
+    const R = num(r);
+    const s = num(w - r * 2);
+    const arc = (dx, dy) => `a${R} ${R} 0 0 1 ${num(dx)} ${num(dy)}`;
+    return (
+        `M${num(x + r)} ${y}h${s}${arc(r, r)}v${s}${arc(-r, r)}` +
+        `h-${s}${arc(-r, -r)}v-${s}${arc(r, -r)}z`
+    );
+}
+
+/**
+ * Finder patterns as geometry rather than modules, so they can be rounded.
+ * `k` scales every radius in proportion, keeping the three squares concentric.
+ *
+ * @returns {{ring: string, center: string}} The 7×7 ring (an outer square
+ *   with a 5×5 hole, filled even-odd) and the 3×3 centre.
+ */
+function finderPaths(size, margin, k) {
+    let ring = '';
+    let center = '';
+    for (const [fx, fy] of finderOrigins(size)) {
+        const x = fx + margin;
+        const y = fy + margin;
+        ring += roundedSquare(x, y, 7, 3.5 * k) + roundedSquare(x + 1, y + 1, 5, 2.5 * k);
+        center += roundedSquare(x + 2, y + 2, 3, 1.5 * k);
+    }
+    return { ring, center };
 }
 
 /**
@@ -70,7 +111,16 @@ function dotsPath(cells, size, margin) {
  * @param {string} [options.dotColor='#000000'] Colour of the data modules.
  * @param {string} [options.cornerColor] Colour of the three finder patterns.
  *   Defaults to `dotColor`.
+ * @param {string} [options.cornerDotColor] Colour of the 3×3 centre of each
+ *   finder pattern. Defaults to `cornerColor`.
  * @param {'dots'|'squares'} [options.shape='dots'] Data module shape.
+ * @param {number} [options.dotRadius=0.5] Radius of a data dot, in modules,
+ *   from 0.2 to 0.5. Only used by the 'dots' shape.
+ * @param {'square'|'rounded'} [options.cornerShape='square'] Finder pattern
+ *   shape.
+ * @param {number} [options.cornerRadius=0.5] Rounding for 'rounded' corners,
+ *   from 0 (square) to 1 (circular).
+ * @param {string} [options.class] Class attribute for the root `<svg>`.
  * @param {number} [options.size] Width/height in px. Omitted by default so the
  *   SVG scales to its container via the viewBox.
  * @param {string} [options.label] Accessible name. Defaults to the payload.
@@ -83,23 +133,20 @@ export function toSVG(input, options = {}) {
     const { modules, size } = encode(input, { ecc: o.ecc, mode: o.mode, minVersion: o.minVersion });
     const total = size + o.margin * 2;
 
-    // Split the matrix so finders can be drawn in their own colour and always
-    // as solid squares, which is what keeps a dotted code readable.
+    // Finders are drawn separately, in their own colours and never as dots,
+    // which is what keeps a dotted code readable.
     const data = new Uint8Array(size * size);
-    const finders = new Uint8Array(size * size);
     for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
             const i = y * size + x;
-            if (!modules[i]) continue;
-            if (isFinder(x, y, size)) finders[i] = 1;
-            else data[i] = 1;
+            if (modules[i] && !isFinder(x, y, size)) data[i] = 1;
         }
     }
 
     const dataPath = o.shape === 'squares'
         ? squaresPath(data, size, o.margin)
-        : dotsPath(data, size, o.margin);
-    const finderPath = squaresPath(finders, size, o.margin);
+        : dotsPath(data, size, o.margin, o.dotRadius);
+    const finder = finderPaths(size, o.margin, o.cornerRadius);
 
     const dimensions = o.size != null
         ? ` width="${esc(o.size)}" height="${esc(o.size)}"`
@@ -108,6 +155,7 @@ export function toSVG(input, options = {}) {
     const parts = [];
     parts.push(
         `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}"${dimensions}` +
+        `${o.className ? ` class="${esc(o.className)}"` : ''}` +
         ` role="img" aria-label="${esc(o.label ?? defaultLabel(input))}"` +
         ` shape-rendering="crispEdges">`
     );
@@ -121,7 +169,17 @@ export function toSVG(input, options = {}) {
         const rendering = o.shape === 'dots' ? ' shape-rendering="geometricPrecision"' : '';
         parts.push(`<path fill="${esc(o.dotColor)}"${rendering} d="${dataPath}"/>`);
     }
-    if (finderPath) parts.push(`<path fill="${esc(o.cornerColor)}" d="${finderPath}"/>`);
+    const cornerRendering = o.cornerRadius > 0 ? ' shape-rendering="geometricPrecision"' : '';
+    if (o.cornerDotColor === o.cornerColor) {
+        // The centre sits inside the ring's hole, so even-odd fills it too.
+        parts.push(
+            `<path fill="${esc(o.cornerColor)}" fill-rule="evenodd"${cornerRendering}` +
+            ` d="${finder.ring}${finder.center}"/>`
+        );
+    } else {
+        parts.push(`<path fill="${esc(o.cornerColor)}" fill-rule="evenodd"${cornerRendering} d="${finder.ring}"/>`);
+        parts.push(`<path fill="${esc(o.cornerDotColor)}"${cornerRendering} d="${finder.center}"/>`);
+    }
     parts.push('</svg>');
 
     return parts.join('');

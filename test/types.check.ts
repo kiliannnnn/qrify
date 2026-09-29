@@ -27,6 +27,11 @@ const svg: string = toSVG('https://example.com', {
     size: 320,
     label: 'Scan me',
     title: 'Link to the post',
+    class: 'qr',
+    cornerDotColor: '#000',
+    cornerShape: 'rounded',
+    cornerRadius: 0.5,
+    dotRadius: 0.4,
 });
 const minimal: string = toSVG('text');
 const transparent: string = toSVG('text', { background: false });
@@ -64,6 +69,10 @@ const svgOnly: SvgOptions = { ...shared, title: 'x' };
 toSVG('text', { ecc: 'X' });
 // @ts-expect-error - shape is a fixed union
 toSVG('text', { shape: 'triangles' });
+// @ts-expect-error - cornerShape is a fixed union
+toSVG('text', { cornerShape: 'circle' });
+// @ts-expect-error - class is SVG-only
+toCanvas(canvasEl, 'text', { class: 'qr' });
 // @ts-expect-error - encode requires an input
 encode();
 // @ts-expect-error - 'kanji' is not a supported mode

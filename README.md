@@ -54,9 +54,13 @@ In Astro, put the import in a `<script>` tag so it runs on the client:
 | `ecc` | `M` | Error correction level: `L`, `M`, `Q` or `H`. Higher survives more damage but needs a bigger code. |
 | `dot-color` | `#000000` | Colour of the data modules. Any CSS colour. |
 | `corner-color` | `#000000` | Colour of the three finder patterns. |
+| `corner-dot-color` | `corner-color` | Colour of the 3×3 centre of each finder pattern. |
+| `corner-shape` | `square` | `square` or `rounded`. |
+| `corner-radius` | `0.5` | Rounding for `rounded` corners, from `0` (square) to `1` (circular). |
 | `bg` | `#ffffff` | Background fill. Use `transparent` to leave it unpainted. |
 | `margin` | `4` | Quiet zone in modules. The specification requires 4; lowering it makes scanning less reliable. |
-| `shape` | `dots` | `dots` or `squares`. Finder patterns are always solid squares. |
+| `shape` | `dots` | `dots` or `squares`. Finder patterns are never drawn as dots. |
+| `dot-radius` | `0.5` | Radius of a data dot in modules, from `0.2` to `0.5`. `0.5` fills the module. |
 | `size` | — | Width/height in px. Omit to let the code scale to its container. |
 | `renderer` | `svg` | `svg` or `canvas`. |
 | `label` | derived from `string` | Accessible name for screen readers. |
@@ -135,7 +139,19 @@ as a single segment — mixing modes within one code is not supported.
 
 ### Options
 
-Both renderers take `ecc`, `margin`, `background`, `dotColor`, `cornerColor`, `shape`, `size`, `label` and `minVersion`. `toSVG` also takes `title`; `toCanvas` also takes `devicePixelRatio`.
+Both renderers take `ecc`, `margin`, `background`, `dotColor`, `cornerColor`, `cornerDotColor`, `shape`, `dotRadius`, `cornerShape`, `cornerRadius`, `size`, `label` and `minVersion`. `toSVG` also takes `title` and `class`; `toCanvas` also takes `devicePixelRatio`.
+
+```js
+// Rounded corners with a coloured ring and a dark centre, and smaller dots.
+toSVG('https://example.com', {
+  cornerShape: 'rounded',
+  cornerRadius: 0.5,       // 0 = square, 1 = circular
+  cornerColor: '#6d28d9',  // the 7×7 ring
+  cornerDotColor: '#111827', // the 3×3 centre
+  dotRadius: 0.4,          // in modules; 0.5 fills the module
+  class: 'qr',             // on the root <svg>
+});
+```
 
 `encode()` throws a `RangeError` when the payload exceeds what a version 40 code can hold, and a `TypeError` for input that is not a string or `Uint8Array`. It never truncates silently.
 
@@ -145,7 +161,8 @@ TypeScript declarations are included.
 
 - **Keep the quiet zone.** `margin="0"` looks tidier and scans worse.
 - **Keep the background opaque.** A transparent code on a dark page is unreadable to most readers. If you want light-on-dark, set both `bg` and `dot-color` explicitly rather than relying on the page behind it.
-- **Raise `ecc` when you decorate.** The `dots` shape removes roughly a fifth of each module's area. `Q` or `H` gives a reader more to work with.
+- **Raise `ecc` when you decorate.** The `dots` shape removes roughly a fifth of each module's area, and a smaller `dotRadius` removes more. `Q` or `H` gives a reader more to work with.
+- **Keep finder patterns dark against the background.** `cornerColor` and `cornerDotColor` both need strong contrast; the ring and centre are what a camera locks onto first.
 - **Give it room.** Below about 2px per module, cameras struggle regardless of what the encoder did.
 
 ## Migrating from 1.x

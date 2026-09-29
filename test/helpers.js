@@ -16,9 +16,10 @@ const {
  *
  * @param {{modules: Uint8Array, size: number}} code
  * @param {object} [opts]
+ * @param {boolean} [opts.pure=true] Use ZXing's pure-barcode shortcut.
  * @returns {string|null} The decoded text, or null when no code was found.
  */
-export function decode({ modules, size }, { scale = 4, quiet = 4 } = {}) {
+export function decode({ modules, size }, { scale = 4, quiet = 4, pure = true } = {}) {
     const side = (size + quiet * 2) * scale;
     const pixels = new Int32Array(side * side).fill(0xffffffff | 0);
 
@@ -43,7 +44,9 @@ export function decode({ modules, size }, { scale = 4, quiet = 4 } = {}) {
     // runs its camera-oriented detector, which spuriously fails to *locate*
     // perfectly valid codes (it reports NotFoundException on output from other
     // encoders too). The hint is about the reader, not about the code.
-    hints.set(DecodeHintType.PURE_BARCODE, true);
+    // Pass `pure: false` to exercise that detector anyway: it is the one that
+    // has to cope with rounded finder patterns.
+    if (pure) hints.set(DecodeHintType.PURE_BARCODE, true);
 
     const reader = new MultiFormatReader();
     reader.setHints(hints);
@@ -69,7 +72,8 @@ export function fakeCanvas(clientWidth = 0) {
         rect: (...a) => calls.push({ op: 'rect', args: a, fill: context.fillStyle }),
         arc: (...a) => calls.push({ op: 'arc', args: a, fill: context.fillStyle }),
         moveTo: (...a) => calls.push({ op: 'moveTo', args: a }),
-        fill: () => calls.push({ op: 'fill', fill: context.fillStyle }),
+        closePath: () => calls.push({ op: 'closePath' }),
+        fill: (...a) => calls.push({ op: 'fill', args: a, fill: context.fillStyle }),
     };
     return {
         width: 0,

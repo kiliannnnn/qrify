@@ -38,17 +38,19 @@ test('honours size, colours and shape', () => {
     assert.match(svg, /fill="#abcdef"/);
 
     // Dots are arcs, squares are straight runs.
-    assert.match(toSVG('hello', { shape: 'dots' }), /a\.5\.5 0 1 0/);
-    assert.doesNotMatch(toSVG('hello', { shape: 'squares' }), /a\.5\.5 0 1 0/);
+    const dataPath = (svg) => svg.match(/<path fill="#000000"[^>]* d="([^"]+)"/)[1];
+    assert.match(dataPath(toSVG('hello', { shape: 'dots' })), /a\.5 \.5 0 1 0 1 0/);
+    assert.doesNotMatch(dataPath(toSVG('hello', { shape: 'squares' })), /a/);
     assert.throws(() => toSVG('hello', { shape: 'triangles' }), TypeError);
     assert.throws(() => toSVG('hello', { margin: -1 }), RangeError);
 });
 
 test('finder patterns stay solid squares even in dot mode', () => {
     const svg = toSVG('hello', { shape: 'dots', dotColor: '#000', cornerColor: '#f00' });
-    const finder = svg.match(/<path fill="#f00" d="([^"]+)"/);
+    const finder = svg.match(/<path fill="#f00"[^>]* d="([^"]+)"/);
     assert.ok(finder, 'expected a separate finder path');
-    assert.doesNotMatch(finder[1], /a\.5\.5/, 'finders must not be drawn as dots');
+    assert.doesNotMatch(finder[1], /a/, 'finders must not be drawn as dots');
+    assert.equal(finder[1].match(/M/g).length, 9, 'a ring (two squares) and a centre per finder');
 });
 
 test('escapes payload-derived text', () => {
@@ -84,6 +86,29 @@ test('canvas modules land on whole device pixels', () => {
         // Backing store is scaled for the display, CSS size stays in layout px.
         assert.equal(canvas.style.width, `${pixels / dpr}px`);
     }
+});
+
+test('canvas draws rounded, two-tone finders and sized dots', () => {
+    const canvas = fakeCanvas();
+    const { scale } = toCanvas(canvas, 'hello', {
+        size: 256,
+        devicePixelRatio: 1,
+        cornerShape: 'rounded',
+        cornerRadius: 1,
+        cornerColor: '#f00',
+        cornerDotColor: '#00f',
+        dotRadius: 0.4,
+    });
+    const fills = canvas.calls.filter((c) => c.op === 'fill');
+    assert.deepEqual(fills.map((c) => [c.fill, c.args[0]]), [
+        ['#000000', undefined],
+        ['#f00', 'evenodd'],
+        ['#00f', undefined],
+    ]);
+    const radii = (fill) => new Set(canvas.calls.filter((c) => c.op === 'arc' && c.fill === fill).map((c) => c.args[2]));
+    assert.deepEqual(radii('#000000'), new Set([0.4 * scale]));
+    assert.deepEqual(radii('#f00'), new Set([3.5 * scale, 2.5 * scale]));
+    assert.deepEqual(radii('#00f'), new Set([1.5 * scale]));
 });
 
 test('canvas falls back to layout width, then to a default', () => {

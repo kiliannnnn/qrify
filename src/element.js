@@ -12,6 +12,10 @@ const OBSERVED = [
     'string',
     'dot-color',
     'corner-color',
+    'corner-dot-color',
+    'corner-shape',
+    'corner-radius',
+    'dot-radius',
     'bg',
     'margin',
     'ecc',
@@ -99,6 +103,8 @@ export function getQrifyElement() {
             const options = {
                 dotColor: this.#attr('dot-color') ?? '#000000',
                 cornerColor: this.#attr('corner-color') ?? undefined,
+                cornerDotColor: this.#attr('corner-dot-color') ?? undefined,
+                cornerShape: this.#attr('corner-shape') ?? 'square',
                 ecc: this.#attr('ecc') ?? 'M',
                 mode: this.#attr('mode') ?? 'auto',
                 shape: this.#attr('shape') ?? 'dots',
@@ -107,6 +113,10 @@ export function getQrifyElement() {
             };
             const margin = this.#attr('margin');
             if (margin != null) options.margin = Number(margin);
+            const cornerRadius = this.#attr('corner-radius');
+            if (cornerRadius != null && cornerRadius !== '') options.cornerRadius = Number(cornerRadius);
+            const dotRadius = this.#attr('dot-radius');
+            if (dotRadius != null && dotRadius !== '') options.dotRadius = Number(dotRadius);
             const size = this.#attr('size');
             if (size != null && size !== '') options.size = Number(size);
             return options;

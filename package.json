@@ -1,6 +1,6 @@
 {
   "name": "@kiliannnnn/qrify",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "QR code generator for the web: a zero-dependency UTF-8 encoder, an SSR-friendly SVG renderer, and a <qr-code> custom element.",
   "type": "module",
   "main": "index.js",

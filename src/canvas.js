@@ -1,5 +1,22 @@
-import { encode, isFinder } from './encoder.js';
+import { encode, isFinder, finderOrigins } from './encoder.js';
 import { resolveOptions, isTransparent, defaultLabel } from './options.js';
+
+/**
+ * Add a `w`-wide square at (x, y) with corners of radius `r` to the path.
+ */
+function roundedSquare(ctx, x, y, w, r) {
+    if (r <= 0) {
+        ctx.rect(x, y, w, w);
+        return;
+    }
+    const q = Math.PI / 2;
+    ctx.moveTo(x + r, y);
+    ctx.arc(x + w - r, y + r, r, -q, 0);
+    ctx.arc(x + w - r, y + w - r, r, 0, q);
+    ctx.arc(x + r, y + w - r, r, q, 2 * q);
+    ctx.arc(x + r, y + r, r, 2 * q, 3 * q);
+    ctx.closePath();
+}
 
 /**
  * Draw a QR code into an existing canvas.
@@ -62,22 +79,32 @@ export function toCanvas(canvas, input, options = {}) {
             if (o.shape === 'squares') {
                 ctx.rect(px, py, scale, scale);
             } else {
-                const r = scale / 2;
-                ctx.moveTo(px + scale, py + r);
-                ctx.arc(px + r, py + r, r, 0, Math.PI * 2);
+                const c = scale / 2;
+                const r = o.dotRadius * scale;
+                ctx.moveTo(px + c + r, py + c);
+                ctx.arc(px + c, py + c, r, 0, Math.PI * 2);
             }
         }
     }
     ctx.fill();
 
-    // Finder patterns stay solid squares regardless of shape.
+    // Finder patterns are never dots: a 7×7 ring, then the 3×3 centre, with
+    // every radius scaled by the same factor so they stay concentric.
+    const k = o.cornerRadius * scale;
     ctx.fillStyle = o.cornerColor;
     ctx.beginPath();
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            if (!modules[y * size + x] || !isFinder(x, y, size)) continue;
-            ctx.rect(off + x * scale, off + y * scale, scale, scale);
-        }
+    for (const [fx, fy] of finderOrigins(size)) {
+        const x = off + fx * scale;
+        const y = off + fy * scale;
+        roundedSquare(ctx, x, y, 7 * scale, 3.5 * k);
+        roundedSquare(ctx, x + scale, y + scale, 5 * scale, 2.5 * k);
+    }
+    ctx.fill('evenodd');
+
+    ctx.fillStyle = o.cornerDotColor;
+    ctx.beginPath();
+    for (const [fx, fy] of finderOrigins(size)) {
+        roundedSquare(ctx, off + (fx + 2) * scale, off + (fy + 2) * scale, 3 * scale, 1.5 * k);
     }
     ctx.fill();
 

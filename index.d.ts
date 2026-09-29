@@ -5,9 +5,10 @@ import type { SvgOptions } from './core.js';
 /**
  * The `<qr-code>` custom element.
  *
- * Attributes: `string` (required), `dot-color`, `corner-color`, `bg`,
- * `margin`, `ecc`, `size`, `shape`, `renderer`, `label`, `canvas-class`,
- * `canvas-style`.
+ * Attributes: `string` (required), `dot-color`, `corner-color`,
+ * `corner-dot-color`, `corner-shape`, `corner-radius`, `dot-radius`, `bg`,
+ * `margin`, `ecc`, `mode`, `size`, `shape`, `renderer`, `label`,
+ * `canvas-class`, `canvas-style`.
  */
 export interface QrifyElement extends HTMLElement {
     /** Current payload. Mirrors the `string` attribute. */

@@ -680,3 +680,13 @@ export function isFinder(x, y, size) {
         (x >= size - f && y < f)            // top-right
     );
 }
+
+/**
+ * Top-left module of each of the three 7×7 finder patterns.
+ *
+ * @param {number} size Matrix width.
+ * @returns {Array<[number, number]>}
+ */
+export function finderOrigins(size) {
+    return [[0, 0], [size - 7, 0], [0, size - 7]];
+}
